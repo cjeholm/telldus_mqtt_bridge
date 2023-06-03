@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 import requests
 import time
 import datetime
@@ -41,10 +41,10 @@ def main():
     # MQTT populate list of devices and sensors
     try:
         device_list = telldus_request('devices/list', config.HEADERS)
-        client1.publish(TOPIC + "/Devices", json.dumps(device_list['device']))
+        client1.publish(config.TOPIC + "/Devices", json.dumps(device_list['device']))
 
         sensor_list = telldus_request('sensors/list', config.HEADERS)
-        client1.publish(TOPIC + "/Sensors", json.dumps(sensor_list['sensor']))
+        client1.publish(config.TOPIC + "/Sensors", json.dumps(sensor_list['sensor']))
 
     except Exception as e:
         sensor_list = {}
@@ -56,7 +56,7 @@ def main():
 
     if config.DEBUG:
         print(str('*** {} ***').format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        print(str('Data source: {}').format(API))
+        print(str('Data source: {}').format(config.API))
 
     if 'success' not in sensor_list or not sensor_list['success']:
         print('Response contained no success.')
@@ -71,7 +71,7 @@ def main():
     for sensor in sensor_list['sensor']:
         try:
             request = 'sensor/info?id=' + str(sensor['id'])
-            sensor_read = telldus_request(request, HEADERS)
+            sensor_read = telldus_request(request, config.HEADERS)
 
         except Exception as e:
             print(str('*** {} ***').format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -81,12 +81,13 @@ def main():
 
         if sensor['model'] == 'temperaturehumidity' or sensor['model'] == 'F824':
 
-            if DEBUG:
+            if config.DEBUG:
                 printbuffer += str('{:15} {:>5}{}C').format(sensor['name'], sensor_read['data'][0]['value'], chr(176))
                 printbuffer += str('{:>7}%\n').format(int(sensor_read['data'][1]['value']))
 
             # MQTT
             mqtt_humidity_data = {
+		'measurement': 'humidity',
                 'name': sensor['name'],
                 'value': sensor_read['data'][1]['value'],
                 'id': sensor['sensorId'],
@@ -98,6 +99,7 @@ def main():
 
             # MQTT
             mqtt_temp_data = {
+		'measurement': 'temperature',
                 'name': sensor['name'],
                 'value': sensor_read['data'][0]['value'],
                 'id': sensor['sensorId'],
@@ -115,13 +117,14 @@ def main():
                 rain[sensor_read['data'][i]['name']] = sensor_read['data'][i]['value']
                 i += 1
 
-            if DEBUG:
+            if config.DEBUG:
                 printbuffer_rain += str('\nRegn totalt {:9} mm\n').format(rain['rtot'])
                 printbuffer_rain += str('Regnintensitet {:>6} mm/h\n').format(rain['rrate'])
                 printbuffer_rain += str('Väderstation batt {:>3}\n').format(sensor_read['battery'])
 
             # MQTT
             mqtt_rain_data = {
+		'measurement': 'rain',
                 'name': sensor['name'],
                 'rtot': rain['rtot'],
                 'rrate': rain['rrate'],
@@ -147,6 +150,7 @@ def main():
 
             # MQTT
             mqtt_wind_data = {
+		'measurement': 'wind',
                 'name': sensor['name'],
                 'wdir': wind['wdir'],
                 'wavg': wind['wavg'],
